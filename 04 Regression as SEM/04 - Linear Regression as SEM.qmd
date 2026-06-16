@@ -1,0 +1,600 @@
+---
+title: "Linear Regression as a Simple SEM"
+author: "Amanda Kay Montoya"
+format: html
+editor: visual
+---
+
+```{r, echo = FALSE}
+fmt <- function(x) sprintf("%.2f", x)
+pfmt <- function(x){
+  if(sprintf("%.3f", x) > .001){
+    return(paste("=", sprintf("%.3f", x)))
+  }
+  else{return("<.001") }
+}
+```
+
+Load packages
+
+```{r, warning = FALSE, message = FALSE}
+library(ggplot2)
+library(lavaan)
+library(mosaic)
+library(dplyr)
+```
+
+# Outline
+
+-   Simple linear regression (single outcome, single predictor)
+-   Multiple linear regression (single outcome, multiple predictors)
+-   Multivariate linear regression (multiple outcomes, multiple predictors)
+-   Benefits of SEM?
+
+# Simple Linear Regression
+
+## Overview Simple Linear Regression
+
+$$Y_i = b_0 + b_1 X_i + e_i$$ A simple regression shows how an outcome ($𝑌_𝑖$) is related to a predictor ($𝑋_𝑖$) through a linear function ($𝑏_0+𝑏_1 𝑋_𝑖$), and remaining error ($𝑒_𝑖$)
+
+### Interpretations:
+
+$𝑏_0$: The predicted $𝑌$ for cases when $𝑋$ is zero
+
+$𝑏_1$: For two cases that differ by 1 unit on $𝑋$, the unit with the higher $𝑋$ is expected to be $𝑏_1$ units higher on $𝑌$
+
+### Ordinary least squares (OLS):
+
+Used to select the values of $𝑏_0$ and $𝑏_1$ in a sample that **minimize the sum of squared errors** $$𝑆𝑆𝐸=\sum^{N}_{i = 1}(𝑒_𝑖^2) =\sum^{N}_{i = 1}(𝑌_𝑖−𝑏_0−𝑏_1 𝑋_𝑖 )^2$$ OLS estimates of $b_0$ and $b_1$ minimize this function.
+
+## Fitting OLS in R
+
+### Understanding Internalizing Symptoms for LatinX Youth
+
+Delgadillo, D., Ramos, G., Montoya, A. K., Thamrin, H., Rapp, A., Escovar, E., & Chavira, D. (2021). Discrimination and Internalizing Disorders in Rural Latinx Adolescents: An Ecological Model of Etiology. *Children and Youth Services Review*, *130*, 106250.
+
+639 Latino students age 14 – 17 completed surveys on multiple measures
+
+**Age** (in years)
+
+**Gender** (Male/Female)
+
+**Perceived Discrimination**: 9 Items SAFE-C on a scale of 1-4
+
+**Peer Victimization**: 4 items Illinois Bullying Scale (IBS) on a scale of 1-4
+
+**Familism**: 7 items Familism Scale (FS) on a scale of 1-5
+
+**Internalizing Symptoms**: 31 items Youth Self Report (YSR) on a scale of 0-2.
+
+```{r}
+ramos <- read.csv("Ramos_Internalizing_nomissing.csv", header = TRUE)
+names(ramos)
+```
+
+### Does discrimination predict internalizing symptoms?
+
+`safe_avg` is the average of the SAFE scores
+
+`internalizing_total` is the sum of the internalizing items
+
+How would we typically approach this question in a linear regression?
+
+$$Y_i = b_0 + b_1 X_i + e_i$$
+
+Where $Y_i$ is `internalizing_total`, and $X_i$ is `safe_avg`
+
+### Descriptives
+
+```{r}
+favstats(~safe_avg, data = ramos)
+```
+
+```{r}
+favstats(~internalizing_total, data = ramos)
+```
+
+### Visualizing the relationship
+
+```{r}
+ggplot(aes(x = safe_avg, y = internalizing_total), data = ramos)+
+  geom_point()+
+  geom_smooth(method = "lm")
+```
+
+### Fitting OLS in R
+
+```{r}
+OLSsimple <- lm(internalizing_total~safe_avg, data = ramos)
+summary(OLSsimple)
+```
+
+```{r, echo = FALSE}
+sumOLSsimple <- summary(OLSsimple)
+```
+
+### Interpretations & Inference
+
+$\hat{b}_0$ = `r coef(OLSsimple)[1]`
+
+For individuals with a discrimination (SAFE) score of zero, their predicted number of internalizing symptoms is `r fmt(coef(OLSsimple)[1])`.
+
+***NOTE:*** Zero is an impossible score on the SAFE scale, so this value is not particularly useful.
+
+**Inference:** The coefficient estimate is significantly different from zero (t(`r OLSsimple$df.residual`) = `r fmt(sumOLSsimple$coefficients[1,3])`, p `r pfmt(sumOLSsimple$coefficients[1,4])`). Therefore we reject the null hypothesis that the population $b_0$ is equal to zero (i.e., we conclude it is not zero).
+
+$\hat{b}_1$ = `r coef(OLSsimple)[2]`
+
+For two individuals who differ by 1 point on discrimination (SAFE) score, the person with the higher score (more discrimination) is predicted to be `r fmt(coef(OLSsimple)[2])` higher in number of internalizing symptoms.
+
+***NOTE:*** We do not use language like "change" or "increase" because in this study we did not directly observe changes or increases. Data is purely corelational. We are describing difference between people with different scores.
+
+**Inference:** The coefficient estimate is significantly different from zero (t(`r OLSsimple$df.residual`) = `r fmt(sumOLSsimple$coefficients[2,3])`, p `r pfmt(sumOLSsimple$coefficients[2,4])`). Therefore we reject the null hypothesis that the population $b_0$ is equal to zero (i.e., we conclude it is not zero).
+
+## The Corresponding SEM
+
+We've established that the main equations for an SEM are
+
+$$ \bf L = \alpha_L + BL + \epsilon_L$$ $$ \bf Z = \alpha_Z + \Lambda L + \epsilon_Z$$
+
+In a linear regression, there are no latent variables ($\bf L$), so it may seem incompatible with SEM
+
+However, we can assume $\bf Z = L$, meaning that $\bf Z$ is a perfect representation of the latent variable (i.e., there is no measurement error)
+
+$$ \bf Z = 0 + 1 L$$ Thus we assume $\bf \alpha_Z = 0$, $\bf \Lambda = I$, and $\bf \epsilon_Z = 0$
+
+### Simpler SEM Equation
+
+Now we work directly with the following equation:
+
+$$ \bf Z = \alpha + BZ + \epsilon$$
+
+No need for the $Z$ subscript on $\alpha$ and $\epsilon$ because we only have $Z$ and no $L$.
+
+Let's assume ${\bf Z} = \begin{bmatrix} X \\ Y \end{bmatrix}$
+
+$${\bf \alpha} = \begin{bmatrix} \alpha_X \\ \alpha_Y \end{bmatrix}$$ $${\bf B} = \begin{bmatrix} 0 & 0 \\ 1 & 0 \end{bmatrix}$$ $${\bf \epsilon} = \begin{bmatrix} \epsilon_X \\ \epsilon_Y \end{bmatrix}$$
+
+### Separate Equations for X and Y
+
+This gives us equations for $X$ and $Y$
+
+$$X_i = \alpha_X + \epsilon_{Xi}$$
+
+$X$ has a mean ($\alpha_X$) and variance ($V(\epsilon_X)$).
+
+$X$ is an exogenous variable, so it's intercept is it's mean, and the residual captures all variance.
+
+$$Y_i = \alpha_Y+ B_{21}X_i + \epsilon_{Yi}$$ $Y$ has a conditional mean ($\alpha_Y + B_{21} X_i$) and a residual variance ($V(\epsilon_Y)$)
+
+This looks just like our regression equation, just with slightly different notation:
+
+$$Y_i = b_0 + b_1 X_i + e_i$$
+
+### Fitting SEM in `lavaan`
+
+This is our first time using `lavaan` and we will add more details as we go, but I want you to see how we can fit the same model in an SEM
+
+`lavaan` uses a string input for the model, similar to the formula in lm (e.g., `internalizing_total~safe_avg`). But it is more complex, because SEM models can be more complex
+
+```{r}
+SEMsimple <- "
+  # safe_avg (X) has an intercept
+  safe_avg ~ 1
+  
+  # safe_avg (X) has a variance
+  safe_avg ~~ safe_avg
+  
+  # internalizing_total (Y) mean structure
+  internalizing_total ~ 1 + safe_avg
+  
+  # internalizing_total (Y) has residual variance
+  internalizing_total ~~ internalizing_total
+"
+```
+
+Important notations:
+
+-   `~` sets the mean structure (1 for intercept `+` predictor names)
+
+-   `~~` allows variables to covary with something... (itself or other variables)
+
+### Fitting Model
+
+```{r}
+SEMsimple.fit <- lavaan(model = SEMsimple, data = ramos)
+summary(SEMsimple.fit)
+```
+
+Let's focus on two results:
+
+1)  $\hat{\alpha}_Y$ = `r fmt(SEMsimple.fit@ParTable$est[2])`
+
+This is the same value that we got from the regression ($\hat{b}_0$)
+
+2)  $\hat{B}_{21}$ = `r fmt(SEMsimple.fit@ParTable$est[4])`
+
+This is the same value as the slope that we got from the regression ($\hat{b}_1$)
+
+### Standard Errors
+
+Compare the standard errors of these two estimates between the models.
+
+What do you see?
+
+| Estimate | $\hat{\alpha}_Y$ | $\hat{B}_{21}$ |
+|--------------------------------|------------------|----------------------|
+| OLS est. | `r sumOLSsimple$coefficients[1,1]` | `r sumOLSsimple$coefficients[2,1]` |
+| SEM est. | `r SEMsimple.fit@ParTable$est[3]` | `r SEMsimple.fit@ParTable$est[4]` |
+| OLS SE | `r sumOLSsimple$coefficients[1,2]` | `r sumOLSsimple$coefficients[2,2]` |
+| SEM SE | `r SEMsimple.fit@ParTable$se[3]` | `r SEMsimple.fit@ParTable$se[4]` |
+
+The estimate values are identical.
+
+But for the standard errors, they are very similar, but differ somewhat.
+
+This core difference is driven by SEMs using maximum likelihood estimation, rather than OLS.
+
+We will discuss this more later.
+
+# Multiple Linear Regression
+
+In a multiple regression we have multiple predictors predicting a single outcome.
+
+$$Y_i = b_0 + \sum^K_{j = 1}b_k X_{ki} + \epsilon_i$$ Consider the example where we incorporate two control variables: `Age` and `Gender`
+
+## Fitting the OLS regression
+
+$$Y_i = b_0 + b_1 X_{1i}+b_2 X_{2i}+b_3 X_{3i} + \epsilon_i$$
+
+```{r}
+OLSmulti <- lm(internalizing_total ~ safe_avg+Age+Gender, data = ramos)
+summary(OLSmulti)
+```
+
+For now, let's focus on the estimated relationship between discrimination and internalizing: `r fmt(OLSmulti$coefficients[2])`
+
+## How to express the SEM
+
+Our simplified SEM equation is
+
+$$ \bf Z = \alpha + BZ + \epsilon$$
+
+Where ${\bf Z} = \begin{bmatrix} {\bf X} \\ Y \end{bmatrix}$
+
+Now $\bf X$ has three elements $X_1$ (discrimination), $X_2$ (age), and $X_3$ (gender).
+
+$\bf B$ also looks different because of the change in the predictors
+
+$${\bf B} = \begin{bmatrix} 0 & 0 & 0 & 0\\ 0 & 0 & 0 & 0\\ 0 & 0 & 0 & 0\\1 & 1 & 1 & 0 \end{bmatrix}$$
+
+No $X$ variables predict each other, but all $X$s predict $Y$.
+
+## How to specify in lavaan
+
+```{r}
+SEMmulti <- "
+  # safe_avg (X1) has an intercept
+  safe_avg ~ 1
+  
+  # safe_avg (X1) has a variance
+  safe_avg ~~ safe_avg
+  
+  # Age (X2) has an intercept
+  Age ~ 1
+  
+  # Age (X2) has a variance
+  Age ~~ Age
+  
+  # Gender (X3) has an intercept
+  Gender ~ 1
+  
+  # Gender (X3) has a variance
+  Gender ~~ Gender
+  
+  # internalizing_total (Y) mean structure
+  internalizing_total ~ 1 + safe_avg+Age+Gender
+  
+  # internalizing_total (Y) has residual variance
+  internalizing_total ~~ internalizing_total
+"
+```
+
+## Fit the model in lavaan
+
+```{r}
+SEMmulti.fit <- lavaan(model = SEMmulti, data = ramos)
+summary(SEMmulti.fit)
+```
+
+As before the coefficient estimates match those from the OLS.
+
+The standard errors are different but only slightly.
+
+# Multivariate Linear Regression
+
+Multivariate linear regression is when we have multiple linear regression equations, predicting different outcomes. These may or may not have the same set of predictors, and the outcome in one equation may also be a predictor in another equation.
+
+For today, let's keep it simple. We will predict internalizing symptoms and familism using the same predictors: discrimination, age, and gender.
+
+## The equations
+
+$$Y_{1i} = \alpha_{Y_1} + b_{11} X_{1i}+b_{12} X_{2i}+b_{13} X_{3i} + \epsilon_{Y_{1i}}$$
+
+$$Y_{2i} = \alpha_{Y_2} + b_{21} X_{1i}+b_{22} X_{2i}+b_{23} X_{3i} + \epsilon_{Y_{2i}}$$
+
+$Y_1$ is internalizing symptoms $Y_2$ is Familism
+
+## Fitting this model with OLS
+
+In an OLS context we would fit these two equations separately
+
+```{r}
+OLSmvInt <- lm(internalizing_total~safe_avg+Age+Gender, data = ramos)
+
+summary(OLSmvInt)
+```
+
+Note that this model is the same as what we just estimated in the previous section
+
+```{r}
+OLSmvFam <- lm(FStot~safe_avg+Age+Gender, data = ramos)
+summary(OLSmvFam)
+```
+
+## Fitting the SEM
+
+Create a script with the information about `FStot`
+
+```{r}
+SEMmulti.fam <- "
+  # FStot (Y2) mean structure
+  FStot ~ 1 + safe_avg+Age+Gender
+  
+  # FStot (Y2) has residual variance
+  FStot ~~ FStot
+"
+```
+
+`lavaan` has a cool feature where you can combine two syntaxes
+
+```{r}
+SEMmv.fit <- lavaan(model = c(SEMmulti,SEMmulti.fam), data = ramos)
+summary(SEMmv.fit)
+```
+Notice that the values are not quite the same as the OLS.
+
+What's going on here? Any ideas?
+
+### Explicit Parameters
+
+Many people might assume that because OLS estimates the two regression separately, that $e_{Y_{1}}$ and $e_{Y_2}$ are independent. 
+
+But this is actually not the case. Estimating the models separately allows the residuals to covary freely. 
+
+```{r}
+cor(resid(OLSmvInt),resid(OLSmvFam))
+```
+
+In the OLS models, people with higher residuals on Internalizing Symptoms tend to have lower residuals on Familism
+
+But in the SEM model, we did not explicitly allow for that correlation (and so it is assumed to be zero)
+
+```{r}
+lavInspect(SEMmv.fit, "theta")
+```
+SEM software is very literal! If you don't include a parameter it will not be included by `lavaan`.
+
+Let's try adding this residual correlation
+
+```{r}
+resid.cor <- "internalizing_total~~FStot"
+SEMmvcr.fit <- lavaan(model = c(SEMmulti,SEMmulti.fam, resid.cor), data = ramos)
+summary(SEMmvcr.fit)
+
+OLSmvFam
+```
+Now everything matches up. We can also look at the residual correlation matrix:
+
+```{r}
+lavInspect(SEMmvcr.fit, "theta")
+cov2cor(lavInspect(SEMmvcr.fit, "theta"))
+```
+
+The SEM estimation of the correlated residuals is very similar to the correlation calculated from the OLS. 
+
+But OLS does not estimate this correlation directly, and thus cannot test hypotheses about this correlation. 
+
+What if we wanted to know whether this correlation was similar to zero or not? OLS cannot tell us directly. 
+
+This explicit modeling of all parameters is an advantage of SEM! 
+ 
+# Benefits of SEM in these contexts?
+
+So, if SEM and OLS regression do essentially the same thing. Why does it matter which one we use? 
+
+Actually, in many circumstances you can use either OLS or SEM and both are equally valuable. 
+
+But, even in these simple regression cases, there are some advantages to SEM that we can see. 
+
+## Missing Data
+
+OLS regression uses listwise deletion. If a case is missing on any variable involved, that case is not included in the analysis. 
+
+The Ramos data does actually have some missingness that we've ignored so far
+
+```{r}
+ramos.missing <- read.csv("Ramos_Internalizing.csv", header = TRUE)
+```
+
+How many cases are there now?
+
+```{r}
+dim(ramos)
+dim(ramos.missing)
+```
+Almost 100 more cases in the data with "missingness"
+
+```{r}
+summary(dplyr::select(ramos.missing, all_of(c("Age", "Gender", "safe_avg", "FStot", "internalizing_total"))))
+```
+
+Many cases are missing on at least some of the variables. 
+
+What happens if we fit the OLS regressions:
+```{r}
+OLSmvInt.miss <- lm(internalizing_total~Age+Gender+safe_avg, data = ramos.missing)
+summary(OLSmvInt.miss)
+OLSmvFam.miss <- lm(FStot~Age+Gender+safe_avg, data = ramos.missing)
+summary(OLSmvFam.miss)
+```
+
+The two models are based on somewhat different samples.
+
+Compare this to SEM
+
+```{r}
+SEMmv.fit.miss <- lavaan(model = c(SEMmulti,SEMmulti.fam, resid.cor), data = ramos.missing)
+summary(SEMmv.fit.miss)
+```
+Default model uses only cases with complete data, which ends up being even smaller than OLS samples. This on it's own is not ideal.
+
+But there are options in SEM that are not available in OLS. Full information maximum likelihood (FIML) can be used when estimating the model to take advantage of the data that is available.
+
+```{r}
+SEMmv.fit.fiml <- lavaan(model = c(SEMmulti,SEMmulti.fam, resid.cor), data = ramos.missing, missing = "ML")
+summary(SEMmv.fit.fiml)
+```
+
+Now, all cases are used (676), but only contribute to relevant parts of the model they have data for. 
+
+More on missing data later in the course. 
+
+## Model Constraints
+
+Another feature available in SEM that is not in OLS, is the ability to constrain parameters. 
+
+There are multiple kinds of constraints one could consider:
+- Value constraints (force a parameter to be exactly a value)
+- Equality constraints (force two parameters to be equal in value)
+
+### Value constraints
+
+Imagine I know, based on the way we collected the data that Age and Gender are uncorrelated. 
+
+I can force their correlation to be exactly zero in the model (we cannot do this in regression)
+
+```{r}
+AG0 <- "Age ~~0*Gender"
+SEMmv.fit.AG0 <- lavaan(model = c(SEMmulti,SEMmulti.fam, resid.cor, AG0), data = ramos.missing, missing = "ML")
+summary(SEMmv.fit.AG0)
+```
+This changes the other estimates in the model, but as long as this restriction is accurate, it should improve the model. 
+
+### Equality Constraints
+
+Older kids tend to show less internalizing and less familism. 
+
+I could force the slope for Age to each endogenous variable to be equal in an SEM.
+
+```{r}
+SEMconstraint <- "
+  # safe_avg (X1) has an intercept
+  safe_avg ~ 1
+  
+  # safe_avg (X1) has a variance
+  safe_avg ~~ safe_avg
+  
+  # Age (X2) has an intercept
+  Age ~ 1
+  
+  # Age (X2) has a variance
+  Age ~~ Age
+  
+  # Gender (X3) has an intercept
+  Gender ~ 1
+  
+  # Gender (X3) has a variance
+  Gender ~~ Gender
+  
+  # internalizing_total (Y1) mean structure
+  internalizing_total ~ 1 + safe_avg+bage*Age+Gender
+  
+  # internalizing_total (Y1) has residual variance
+  internalizing_total ~~ internalizing_total
+    
+  # FStot (Y2) mean structure
+  FStot ~ 1 + safe_avg+bage*Age+Gender
+  
+  # FStot (Y2) has residual variance
+  FStot ~~ FStot
+  
+  # correlated errors
+  FStot ~~ internalizing_total
+"
+SEMconstraint.fit <- lavaan(SEMconstraint, data = ramos.missing, missing = "ML")
+
+summary(SEMconstraint.fit)
+```
+
+So long as this constraint is accurate it simplifies the model. 
+
+## Testing Model Parameters
+
+Perhaps instead of forcing the path from Age to each outcome to be equal, I want to test their difference. 
+
+I can also do this in an SEM
+
+```{r}
+SEMtest <- "
+  # safe_avg (X1) has an intercept
+  safe_avg ~ 1
+  
+  # safe_avg (X1) has a variance
+  safe_avg ~~ safe_avg
+  
+  # Age (X2) has an intercept
+  Age ~ 1
+  
+  # Age (X2) has a variance
+  Age ~~ Age
+  
+  # Gender (X3) has an intercept
+  Gender ~ 1
+  
+  # Gender (X3) has a variance
+  Gender ~~ Gender
+  
+  # internalizing_total (Y1) mean structure
+  internalizing_total ~ 1 + safe_avg+bage.int*Age+Gender
+  
+  # internalizing_total (Y1) has residual variance
+  internalizing_total ~~ internalizing_total
+    
+  # FStot (Y2) mean structure
+  FStot ~ 1 + safe_avg+bage.fs*Age+Gender
+  
+  # FStot (Y2) has residual variance
+  FStot ~~ FStot
+  
+  # correlated errors
+  FStot ~~ internalizing_total
+  
+  bage.diff := bage.int-bage.fs
+"
+SEMtest.fit <- lavaan(SEMtest, data = ramos.missing, missing = "ML")
+
+summary(SEMtest.fit)
+```
+
+There is not a significant difference between the two age slopes! 
+
+## But Beware!
+
+While SEM makes it very easy to do many different things, we have to be thoughtful and theory driven in our choices. 
+
+We cannot "double dip" in our models, constantly respecifying until we get something that "looks publishable". 
+
+For example, it would not be appropriate to look at the unconstrained model, observe the similarity, test the constraint, then add the constraint, if there's no theoretical reason to suggest these paths are equal. 
+
+Otherwise we are just capitalizing on chance. 
