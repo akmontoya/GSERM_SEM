@@ -1,0 +1,573 @@
+---
+title: "Introduction to Lavaan"
+author: "Amanda Montoya"
+date: "06/17/2026"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## What is lavaan?
+
+`lavaan` (latent variable analysis) is an R package developed by Yves Rosseel
+
+
+It was first released in 2012
+
+
+When you use `lavaan` you should cite it!
+
+
+Yves Rosseel (2012). lavaan: An R Package for Structural Equation Modeling. Journal of Statistical Software, 48(2), 1-36. URL http://www.jstatsoft.org/v48/i02/
+
+
+
+## Installing lavaan
+
+`lavaan` is a package in R which is downloadable via CRAN
+
+
+```{r, eval = FALSE}
+install.packages("lavaan", dependencies = TRUE)
+```
+
+You only ever need to install `lavaan` once on each computer you use it on. But you should regularly update your packages. Always report the version number you are using in your paper!
+
+
+If `lavaan` is correctly installed you should get a little happy message when you run the following:
+
+
+```{r}
+library(lavaan)
+```
+
+
+You do need to run the above command every time you start an R session. 
+
+
+I recommend in your scripts always having a section at the top which includes all your libraries. 
+
+
+## Model Specification
+
+
+`lavaan` works by creating an object in R which is a string (characters) that takes on a specific form to specify your model. 
+
+
+That string is then input into one of the lavaan functions (more on this later) along with the data to fit the model. 
+
+
+Here's an example:
+
+
+```{r, eval = FALSE}
+myModel <- '
+   # latent variables
+     ind60 =~ x1 + x2 + x3
+     dem60 =~ y1 + y2 + y3 + y4
+     dem65 =~ y5 + y6 + y7 + y8
+   # regressions
+     dem60 ~ ind60
+     dem65 ~ ind60 + dem60
+   # residual covariances
+     y1 ~~ y5
+     y2 ~~ y4 + y6
+     y3 ~~ y7
+     y4 ~~ y8
+     y6 ~~ y8
+'
+fit <- sem(model = myModel,
+           data  = PoliticalDemocracy)
+summary(fit)
+```
+
+
+We will start by learning about the different symbols and how they are used in the syntax. 
+
+
+### Regression ($B$)
+
+
+To specify the paths that are included in $B$ you will need to use the syntax ~ ("tilde" pronounced "til-duh")
+
+
+Variables on the left side of the ~ are the endogenous variables. 
+
+
+Variable on the right side of the ~ are the predictors (could be endogenous or exogenous).
+
+
+```{r, eval = FALSE}
+y1~x1
+```
+
+
+This command means the variable `y1` in the specified data set has one predictor: `x1`
+
+
+You can have multiple predictors by putting a `+` in between their names
+
+
+```{r, eval = FALSE}
+y1~x1+x2
+```
+
+
+This command means the variable `y1` in the specified data set has two predictors: `x1` and `x2`
+
+
+You can have multiple regression equations
+
+
+```{r, eval = FALSE}
+y1~x1+x2
+y2~x1+x2+x3
+```
+
+
+Now we have two endogenous variables: `y1` and `y2`. 
+
+
+Here the equation for `y1` is the same as the previous example.
+
+
+Additionally `y2` has 3 predictors `x1`, `x2`, and `x3`. 
+
+
+The predictors for each endogenous variable can be the same or different from the other equations. 
+
+
+If you have two endogenous variables which have the same equations you can shorten the syntax
+
+
+```{r, eval = FALSE}
+y1~x1+x2+x3
+y2~x1+x2+x3
+```
+
+
+is the same as
+
+
+```{r, eval = FALSE}
+y1+y2~x1+x2+x3
+```
+
+
+be very careful with this though. 
+
+
+Remember that endogenous variables can also be predictors, so we could have:
+
+
+```{r, eval = FALSE}
+y1~x1
+y2~y1+x1
+```
+
+
+The variables in these equations can be latent variables as well, but we'll leave that for a future lesson. 
+
+
+## Variances and Covariances ($\Sigma_\epsilon\epsilon$)
+
+
+You can specify that two variables covary by using `~~`
+
+
+For example if I want to specify that `x1` and `x2` covary I will specify
+
+
+```{r, eval=FALSE}
+x1~~x2
+```
+
+
+If I want to estimate the variance of `x1` (which is the covariance of a variable with itself)
+
+
+```{r, eval=FALSE}
+x1~~x1
+```
+
+
+*Important Warning: Covariances of deviations*
+
+
+Perhaps one of the least intuitive things about `lavaan` is the way we specify covariances of deviances. 
+
+
+Consider the following model:
+
+
+```{r, eval = FALSE}
+y1~x1+x2
+y2~x1+x2+x3
+```
+
+
+Let's say I want to let the deviance for `y1` covary with the deviance for `y2`. 
+
+
+I could add
+
+
+```{r, eval=FALSE}
+y1~~y2
+```
+
+
+This would add a covariance to the residuals (not the variables directly). 
+
+
+If you want to incorporate multiple covariances you can express it two ways
+
+
+```{r, eval=FALSE}
+y1~~y2
+y1~~y3
+```
+
+
+or 
+
+
+```{r, eval=FALSE}
+y1~~y2+y3
+```
+
+
+## Putting the whole script together
+
+
+To specify the whole command you will put each line together in a string. 
+
+
+You can use line breaks or semicolons to separate the commands
+
+
+```{r, eval=FALSE}
+modelsyntax <- '
+     y1~x1+x2
+     y2~x1+x2+x3
+     y1~~y2
+'
+```
+
+
+or 
+
+
+```{r, eval=FALSE}
+modelsyntax <- 'y1~x1+x2; y2~x1+x2+x3; y1~~y2'
+```
+
+
+You will likely want to save the string as an object (`name <- `)
+
+
+You can also save different parts separately (this is useful for fitting multiple models with different parts)
+
+
+```{r, eval=FALSE}
+regressions <- "
+     y1~x1+x2
+     y2~x1+x2+x3
+"
+covariances <- "y1~~y2"
+```
+
+
+You can include comments inside the script using `#` to help remind yourself what everything is and stay organized!
+
+
+```{r, eval=FALSE}
+modelsyntax <- "
+     #regressions
+     y1~x1+x2
+     y2~x1+x2+x3
+     
+     #covariances
+     y1~~y2
+"
+```
+
+
+## Fitting Functions in `lavaan`
+
+
+`lavaan` has multiple functions built in to help with estimating models. The three we will use in this class are 
+
+* lavaan
+* sem
+* cfa
+
+
+The `lavaan()` function is the most general, it essentially requires full specification (nothing is done for you)
+
+
+The `sem()` function is probably what you will use most. It allows for latent variable regressions, whereas `cfa()` does not. The `cfa()` function is specifically for latent variable models with no regressions among the latent variables. 
+
+
+`sem()` and `cfa()` are considered "helper functions", this means they automatically do a few things for us without us specifying them:
+
+* Fix the latent variable intercepts to zero ($\alpha_L$)
+* Elements of $\Sigma_{\epsilon_{L_X} \epsilon_{L_X}}$ and $\Sigma_{\epsilon_{L_Y} \epsilon_{L_Y}}$ are freely estimated unless otherwise specified (unless this results in an underidentified)
+
+
+## Introducing our data
+
+
+The data we'll use today come from Beshai et al. (2020) (https://doi.org/10.1016/j.brat.2020.103724). The study looks at the effectiveness of a Mindfulness Intervention in reducing depression and anxiety, by increasing mindfulness and self-compassion. All measures were taken at pre-test and post-test.
+
+
+For now we'll stick with 4 variables:
+
+
+* PreMindfulness: Mindfulness at pretest as measured by a scale score on the Five Facet Mindfulness Questionnaire - 15
+* PostMindfulness: Mindfulness at posttest as measured by a scale score on the Five Facet Mindfulness Questionnaire - 15
+* PreAnxiety: Anxiety at pretest as measured by a scale score on the Generalized Anxiety Disorder - 7. 
+* PostAnxiety: Anxiety at posttest as measured by a scale score on the Generalized Anxiety Disorder - 7. 
+
+
+Let's load in the data
+
+
+```{r}
+BeshaiData <- read.csv("BeshaiData.csv", header = TRUE)
+names(BeshaiData)[1] <- "PreMindfulness"
+```
+
+
+## Fitting the Model
+
+
+First, let's consider a simple model, where PreMindfulness predicts PostMindfulness. 
+
+
+Specify the model syntax
+
+
+```{r}
+simplesyntax <- '
+    PostMindfulness~PreMindfulness
+    '
+```
+
+
+The equation for this would be:
+
+
+$$Z_2 = \alpha_2+B_{21}Z_1+\epsilon_2$$
+
+
+Next we'll use a fitting function (`sem()`) to fit the model and save the result
+
+
+```{r}
+simplefit <- sem(simplesyntax, data = BeshaiData)
+```
+
+
+Now we'll look at the summary for `simplefit`
+
+
+```{r}
+summary(simplefit)
+```
+
+
+The estimator is ML means that we used maximum likelihood to estimate the model. This is the default in lavaan, but we could also specify the argument `estimator = "ML"` is the `sem()` command and get the same result. 
+
+
+Number of model parameters is the number of parameters estimates ($N_\theta$)
+
+
+Number of observations is the sample size ($N$)
+
+
+Ignore "Model Test User Model" for now... we'll get back to this soon
+
+
+The "Parameter Estimates" section describes what matrices were used for estimation. We'll stick with the defaults for now. 
+
+
+Under regressions, we get a path coefficient, standard error, z-value, and p-value! This is $\hat{B_{21}}$, with it's estimated standard errors and significance test. 
+
+
+In the variances, we get the estimated variance of $\epsilon_2$ (i.e., the residual variance of $Z_2$). You can tell it's a residual variance because of the . infront of the variable name (.PostMindfulness)
+
+
+## Extracting Information
+
+
+### lavInspect
+
+
+The `lavInspect()` function can be used to "look inside" a specific model object. It will print out the model matrices that are used for the model. 
+
+
+Free parameters are non-zero integers. Fixed parameters are 0 (even if they are fixed to something other than zero)
+
+
+```{r}
+lavInspect(simplefit)
+```
+
+
+The notation that `lavaan` uses is kind of a modified LISREL notation (closer to the all-y LISREL notation)
+
+
+### fitted.values
+
+
+The `fitted.value()` function returns the model-implied covariance matrix
+
+
+```{r}
+fitted.values(simplefit)
+```
+
+
+### vcov
+
+
+`vcov` gives the estimated covariance matrix of the *parameter estimates* (that second derivative thing we talked about last time). The square root of the diagonal of this matrix is the standard errors. 
+
+
+```{r}
+vcov(simplefit)
+sqrt(diag(vcov(simplefit)))
+```
+
+
+## Model Constraints
+
+### Fixing Parameters at specific values
+
+You can fix certain parameters to specific values by specifying them in the model syntax. You do this by entering in the number and * as part of the specification.
+
+```{r, eval = FALSE}
+y1~~0*y2
+```
+
+This will set the deviances of y1 and y2 to be uncorrelated 
+
+Doing this with deviances is very important because `lavaan` can be a little cavalier with correlated deviances. 
+
+Similarly you can set specific regression coefficients to be a certain value. 
+
+```{r, eval = FALSE}
+y1~1*x1+x2
+```
+
+This will fix the regression coefficient of x1 to be 1, while the coefficient for x2 is freely estimated
+
+### Fixing values to be equal
+
+You can name specific parameters in `lavaan` with the same approach
+
+```{r, eval = FALSE}
+y1~B31*x1+B32*x2
+```
+
+And if you wanted to fix two parameters to be equal, give them the same name
+
+```{r, eval = FALSE}
+y1~B31*x1+B32*x2
+y2~B31*x1+B32*x2
+```
+
+lavaan would only estimate two regression parameters in this model. 
+
+## Practice with Beshai Data
+
+
+Consider a model where PreMindfulness, PreAnxiety, and PostMindfulness all predict PostAnxiety. PreMindfulness predicts PostMindfulness.
+
+
+Try to sketch out a path diagram before moving on. 
+
+
+Write out the equations for PostMindfulness $y_1$, and PostAnxiety $y_2$
+
+
+Model Syntax
+
+
+```{r}
+modelsyntax <- '
+   # regressions
+     PostMindfulness ~ PreMindfulness
+     PostAnxiety ~ PreMindfulness+PreAnxiety+PostMindfulness
+'
+```
+
+
+We have a model for PostMindfulness and a model for PostAnxiety.
+
+
+```{r}
+fit <- sem(model = modelsyntax,
+           data  = BeshaiData)
+summary(fit)
+```
+
+What did we learn?
+
+
+* Higher levels of pretest mindfulness are significantly related to higher levels of posttest mindfulness ($B_{31} = 0.779$, $SE = 0.052$, $p < .001$)
+* Higher levels of pretest mindfulness are significantly related to higher levels of posttest anxiety controlling for pretest anxiety and posttest mindfulness ($B_{41} = 0.167$, $SE = 0.055$, $p = .002$)
+* Higher levels of pretest anxiety significantly related to higher levels of posttest anxiety controlling for pretest mindfulness and posttest mindfulness ($B_{42} = 0.558$, $SE = .065$, $p < .001$)
+* Higher levels of posttest mindfulness are significantly related to lower levels of posttest anxiety controlling for pretest mindfulness and pretest mindfulness ($B_{43} = -0.338$, $SE = .052$, $p < .001$)
+
+
+Variances of the deviances are significant, suggesting that there is residual variance (we have not explained all the variability in either outcome). *Note* this is usually a kind of trivial result that is not always of great interest. 
+
+
+### Standardized Coefficients?
+
+
+You can get **standardized coefficient estimates** by adding `standardized = TRUE` to the `summary` function. Two results will be added:
+
+* Std.lv means that all latent variables are standardized
+* Std.all means both latent and observed variables are standardized
+
+```{r}
+summary(fit, standardized = TRUE)
+```
+
+
+Notice that the `std.lv` results are no different from the original results, because there are not latent variables in the model. The `std.all` coefficients are different because the standard deviation of the observed variables is set to 1 (notice this also changes the variance estimates for the deviations). 
+
+
+The deviation variances now have a nice interpretation
+
+
+$1-\Sigma_{\epsilon_Y{_j} \epsilon_Y{_j}$ is the explained variance in $y_j$
+
+
+59% of the variance in posttest mindfulness is explained by other variables in the model
+
+
+49% of the variance in posttest anxiety is explained by other variables in the model
+
+
+### Correlated Deviances?
+
+
+In this model the deviances are not correlated. Let's see what happens if we allow them to be correlated. 
+
+
+```{r}
+corzeta <- 'PostMindfulness~~PostAnxiety'
+fit2 <- sem(c(modelsyntax, corzeta), data = BeshaiData)
+summary(fit2)
+```
+
+
+The model is not identified and `lavaan` has caught that! It provides some estimates (actually the same as if the correlation is fixed at zero) but no standard errors. 
